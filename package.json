@@ -1,0 +1,20 @@
+{
+  "name": "html-to-jsx",
+  "version": "0.0.1-alpha",
+  "description": "Converts HTML to JSX",
+  "author": "Wanglei <wallewawo@aliyun.com> (http://wallewawo.com/)",
+  "license": "MIT",
+  "keywords": [
+    "react",
+    "jsx",
+    "htmltojsx",
+    "html"
+  ],
+  "scripts": {
+    "test": "node ./test/index.js"
+  },
+  "dependencies": {
+    "jsdom-no-contextify": "^3.1.0"
+  },
+  "devDependencies": {}
+}
