@@ -1,139 +1,18 @@
+const { createElement, escapeSpecialChars } = require('./utils/html-dom')
+const { getJsxTagName, getJSXStyle, getJSXAttributeName } = require('./utils/jsx-dom')
+const { isNumeric } = require('./utils/number')
+const { isEmpty: isEmptyText } = require('./utils/string')
+
 const NODE_TYPE = {
   ELEMENT: 1,
   TEXT: 3,
   COMMENT: 8
 }
 
-const ELEMENT_TAG_NAME_MAPPING = {
-  a: 'a',
-  altglyph: 'altGlyph',
-  altglyphdef: 'altGlyphDef',
-  altglyphitem: 'altGlyphItem',
-  animate: 'animate',
-  animatecolor: 'animateColor',
-  animatemotion: 'animateMotion',
-  animatetransform: 'animateTransform',
-  audio: 'audio',
-  canvas: 'canvas',
-  circle: 'circle',
-  clippath: 'clipPath',
-  'color-profile': 'colorProfile',
-  cursor: 'cursor',
-  defs: 'defs',
-  desc: 'desc',
-  discard: 'discard',
-  ellipse: 'ellipse',
-  feblend: 'feBlend',
-  fecolormatrix: 'feColorMatrix',
-  fecomponenttransfer: 'feComponentTransfer',
-  fecomposite: 'feComposite',
-  feconvolvematrix: 'feConvolveMatrix',
-  fediffuselighting: 'feDiffuseLighting',
-  fedisplacementmap: 'feDisplacementMap',
-  fedistantlight: 'feDistantLight',
-  fedropshadow: 'feDropShadow',
-  feflood: 'feFlood',
-  fefunca: 'feFuncA',
-  fefuncb: 'feFuncB',
-  fefuncg: 'feFuncG',
-  fefuncr: 'feFuncR',
-  fegaussianblur: 'feGaussianBlur',
-  feimage: 'feImage',
-  femerge: 'feMerge',
-  femergenode: 'feMergeNode',
-  femorphology: 'feMorphology',
-  feoffset: 'feOffset',
-  fepointlight: 'fePointLight',
-  fespecularlighting: 'feSpecularLighting',
-  fespotlight: 'feSpotLight',
-  fetile: 'feTile',
-  feturbulence: 'feTurbulence',
-  filter: 'filter',
-  font: 'font',
-  'font-face': 'fontFace',
-  'font-face-format': 'fontFaceFormat',
-  'font-face-name': 'fontFaceName',
-  'font-face-src': 'fontFaceSrc',
-  'font-face-uri': 'fontFaceUri',
-  foreignobject: 'foreignObject',
-  g: 'g',
-  glyph: 'glyph',
-  glyphref: 'glyphRef',
-  hatch: 'hatch',
-  hatchpath: 'hatchpath',
-  hkern: 'hkern',
-  iframe: 'iframe',
-  image: 'image',
-  line: 'line',
-  lineargradient: 'linearGradient',
-  marker: 'marker',
-  mask: 'mask',
-  mesh: 'mesh',
-  meshgradient: 'meshgradient',
-  meshpatch: 'meshpatch',
-  meshrow: 'meshrow',
-  metadata: 'metadata',
-  'missing-glyph': 'missingGlyph',
-  mpath: 'mpath',
-  path: 'path',
-  pattern: 'pattern',
-  polygon: 'polygon',
-  polyline: 'polyline',
-  radialgradient: 'radialGradient',
-  rect: 'rect',
-  script: 'script',
-  set: 'set',
-  solidcolor: 'solidcolor',
-  stop: 'stop',
-  style: 'style',
-  svg: 'svg',
-  switch: 'switch',
-  symbol: 'symbol',
-  text: 'text',
-  textpath: 'textPath',
-  title: 'title',
-  tref: 'tref',
-  tspan: 'tspan',
-  unknown: 'unknown',
-  use: 'use',
-  video: 'video',
-  view: 'view',
-  vkern: 'vkern'
-}
-
 const defaultProps = {
   indent: '  '
 }
 
-let createElement
-if (typeof window !== 'undefined') {
-  createElement = document.createElement()
-} else {
-  const jsdom = require('jsdom-no-contextify').jsdom
-  createElement = function(tag) {
-    return jsdom().defaultView.document.createElement(tag)
-  }
-}
-
-const isEmtryText = (text) => {
-  return /^\s*$/.test(text)
-}
-
-const getJsxTagName = (tagName) => {
-  const name = tagName.toLowerCase();
-
-  if (Reflect.has(ELEMENT_TAG_NAME_MAPPING, name)) {
-    name = ELEMENT_TAG_NAME_MAPPING[name];
-  }
-
-  return name
-}
-
-const tempEl = createElement('div')
-const escapeSpecialChars = (text) => {
-  tempEl.textContent = text
-  return tempEl.innerHTML
-}
 
 class HtmlToJSX {
 
@@ -154,18 +33,20 @@ class HtmlToJSX {
       throw new Error('html中不可以包含<script>标签')
     }
 
-    // 确保顶级只有一个element节点, 否则直接给react渲染会报错
+    // 确保顶级只有一个dom节点, 否则直接给react渲染会报错
     if (this.onlyOneTopElement(containerEl)) {
       let output = ''
       for (let i = 0; i < containerEl.childNodes.length; i++) {
-        output += this.domToJSX(containerEl.childNodes[i])
+        output += this.domToJSX({ node: containerEl.childNodes[i] })
       }
       return output
     } else {
-      return this.domToJSX(containerEl)
+      return this.domToJSX({ node: containerEl })
     }
   }
 
+  // 是否只有一个顶层节点
+  // 
   onlyOneTopElement (containerEl) {
     const childNodes = containerEl.childNodes
     if (childNodes.length === 1 && childNodes[0].nodeType === NODE_TYPE.ELEMENT) return true
@@ -181,8 +62,8 @@ class HtmlToJSX {
             hasElement = true
           }
           break
-        case NODE_TYPE.COMMENT:
-          if (isEmtryText(child.textContent)) {
+        case NODE_TYPE.TEXT:
+          if (isEmptyText(child.textContent)) {
             return false
           }
           break
@@ -192,80 +73,131 @@ class HtmlToJSX {
     return true
   }
 
-  domToJSX (element, level = 0) {
+  domToJSX ({ node, level = 0 }) {
     let output = ''
-    
-    switch (element.nodeType) {
+    const indent = new Array(level + 1).join(this.indent)
+
+    switch (node.nodeType) {
       case NODE_TYPE.ELEMENT:
-        output += this.visitStartTag(element)
-        output += this.visitInner(element, level)
-        output += this.visitCloseTag(element)
+        output += level > 0 ? '\n' : ''
+        output += this.visitElement({ node, indent, level })
         break
       case NODE_TYPE.TEXT:
-        const parentTag = element.parentNode && getJsxTagName(element.parentNode.tagName)
-        if (['textarea', 'style'].includes(parentTag)) {
-          return
-        }
-        const text = escapeSpecialChars(element.textContent)
-
-        if (isEmtryText(text)) {
-          output += text
-        } else {
-          output += '{\'' + text.replace(/\{|\}|\'/g, brace => '\\' + brace) + '\'}'
-        }
+        output += this.visitText({ node, indent, level })
         break
       case NODE_TYPE.COMMENT:
-        output += '{/*' + element.textContent.replace(/\//g, '\\/') + '*/}'
+        output += this.visitComment({ node, indent, level })
         break
       default:
         const tmpNode = document.createElement('div')
         tmpNode.appendChild('element')
-        console.warn(`不被认可的节点类型: ${element.nodeType}, 内容: ${tmpNode.innerHTML}`)
+        console.warn(`不被认可的节点类型: ${node.nodeType}, 内容: ${tmpNode.innerHTML}`)
     }
 
     return output
   }
 
-  visitStartTag (element, level) {
-    const tagName = getJsxTagName(element.tagName)
+  visitElement ({ node, indent, level }) {
+    const tagName = getJsxTagName(node.tagName)
+    let output = ''
+    if (!node.firstChild || tagName === 'textarea' || tagName === 'style') {
+      output += this.visitStartTag({ node, tagName, level, indent, isSelfClosingTag: true })
+    } else {
+      output += this.visitStartTag({ node, tagName, level, indent, isSelfClosingTag: false })
+      output += this.visitInner({ node, level, indent })
+      output += this.visitCloseTag({ node, tagName, level, indent })
+    }
+    return output
+  }
 
+  visitStartTag ({ node, tagName, indent, isSelfClosingTag }) {
     const attributes = []
-    for (let i = 0; i < element.attributes.length; i++) {
-      attributes.push(this.getElementAttribute(element, element.attributes[i]));
+    for (let i = 0; i < node.attributes.length; i++) {
+      attributes.push(this.getElementAttribute({ tagName, attribute: node.attributes[i] }));
     }
     if (tagName === 'textarea') {
       // Hax: textareas need their inner text moved to a "defaultValue" attribute.
-      attributes.push('defaultValue={' + JSON.stringify(element.value) + '}');
+      attributes.push('defaultValue={' + JSON.stringify(node.value) + '}');
     }
     if (tagName === 'style') {
       // Hax: style tag contents need to be dangerously set due to liberal curly brace usage
-      attributes.push('dangerouslySetInnerHTML={{__html: ' + JSON.stringify(element.textContent) + ' }}');
+      attributes.push('dangerouslySetInnerHTML={{__html: ' + JSON.stringify(node.textContent) + ' }}');
     }
 
-    let output = '<' + tagName
+    let output = indent + '<' + tagName
     if (attributes.length > 0) {
       output += ' ' + attributes.join(' ');
     }
-    output += '>'
+    output += isSelfClosingTag ? ' />' : '>' 
 
     return output
   }
 
-  getElementAttribute (element, attribute) {
-    return attribute.name + '=\'' + attribute.value + '\''
-  }
-
-  visitInner (element, level) {
+  getElementAttribute ({ tagName, attribute }) {
     let output = ''
-    for (let i = 0; i < element.childNodes.length; i++) {
-      output += this.domToJSX(element.childNodes[i], level + 1);
+    switch (attribute.name) {
+      case 'style':
+        output += 'style={' + getJSXStyle(attribute.value) + '}'
+        break
+      default:
+        const attributeName = getJSXAttributeName(tagName, attribute.name)
+
+        output += attributeName
+        if (isNumeric(attribute.value)) {
+          output += '={' + attribute.value + '}';
+        } else if (attribute.value.length > 0) {
+          output += '="' + attribute.value.replace(/"/gm, '&quot;') + '"';
+        } else if(attribute.value.length === 0 && attribute.name === 'alt') {
+          output += '=""';
+        }
     }
     return output
   }
 
-  visitCloseTag (element) {
-    const tagName = getJsxTagName(element.tagName)
-    return `</${tagName}>`
+  visitInner ({ node, level }) {
+    let output = ''
+    for (let i = 0; i < node.childNodes.length; i++) {
+      output += this.domToJSX({ node: node.childNodes[i], level: level + 1 });
+    }
+    return output
+  }
+
+  visitCloseTag ({ node, tagName, indent }) {
+    let output = ''
+    if (node.childNodes.length > 1 || node.firstChild.textContent.trim().indexOf('\n') >= 0) {
+      output += '\n' + indent
+    }
+    output += `</${tagName}>`
+    return output
+  }
+
+  visitText ({ node, indent }) {
+    const parentTag = node.parentNode && getJsxTagName(node.parentNode.tagName)
+    if (['textarea', 'style'].includes(parentTag)) {
+      return
+    }
+    const text = escapeSpecialChars(node.textContent.trim())
+
+    if (!isEmptyText(text)) {
+      let output = ''
+
+      const mtext = text.split('\n')
+      if (mtext.length > 1) {
+        output += '\n'
+        output += mtext
+          .map(row => indent + '{\'' + row.trim().replace(/\{|\}|\'/g, brace => '\\' + brace) + '\'}')
+          .join('\n')
+      } else {
+        output += '{\'' + mtext[0].trim().replace(/\{|\}|\'/g, brace => '\\' + brace) + '\'}'
+      }
+      return output
+    } else {
+      return ''
+    }
+  }
+
+  visitComment ({ node, indent }) {
+    return '\n' + indent + '{/*' + node.textContent.replace(/\//g, '\\/') + '*/}'
   }
 }
 
